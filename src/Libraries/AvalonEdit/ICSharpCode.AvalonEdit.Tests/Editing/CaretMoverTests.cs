@@ -55,5 +55,29 @@ namespace ICSharpCode.AvalonEdit.Editing
 
             Assert.AreEqual(new TextLocation(2, 1), textArea.Caret.Location);
         }
+
+        [Test]
+        public void CaretMovingDownMultipleTimesDoesNotMovePastEndOfDocument()
+        {
+            TextArea textArea = new TextArea();
+            textArea.Document = new TextDocument("1\n2\n3\n4th line");
+            textArea.Caret.Location = new TextLocation(2, 1);
+
+            CaretMover.MoveCaret(textArea, CaretMovementType.LineDown, 5);
+
+            Assert.AreEqual(new TextLocation(4, 1), textArea.Caret.Location);
+        }
+
+        [Test]
+        public void CaretMovingUpMultipleTimesDoesNotMovePastBeginningOfDocument()
+        {
+            TextArea textArea = new TextArea();
+            textArea.Document = new TextDocument("1\n2\n3\n4th line");
+            textArea.Caret.Location = new TextLocation(3, 1);
+
+            CaretMover.MoveCaret(textArea, CaretMovementType.LineUp, 5);
+
+            Assert.AreEqual(new TextLocation(1, 1), textArea.Caret.Location);
+        }
     }
 }

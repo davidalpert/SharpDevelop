@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Diagnostics;
 using System.Windows.Documents;
 using System.Windows.Media.TextFormatting;
@@ -190,7 +191,16 @@ namespace ICSharpCode.AvalonEdit.Editing
                         }
                         else
                         {
-                            targetLine = null;
+                            DocumentLine prevLine = textArea.Document.Lines.FirstOrDefault();
+                            if (prevLine != null)
+                            {
+                                targetVisualLine = textArea.TextView.GetOrConstructVisualLine(prevLine);
+                                targetLine = targetVisualLine.TextLines[targetVisualLine.TextLines.Count - 1];
+                            }
+                            else
+                            {
+                                targetLine = null;
+                            }
                         }
                         break;
                     }
@@ -211,7 +221,16 @@ namespace ICSharpCode.AvalonEdit.Editing
                         }
                         else
                         {
-                            targetLine = null;
+                            DocumentLine nextLine = textArea.Document.Lines.LastOrDefault();
+                            if (nextLine != null)
+                            {
+                                targetVisualLine = textArea.TextView.GetOrConstructVisualLine(nextLine);
+                                targetLine = targetVisualLine.TextLines[0];
+                            }
+                            else
+                            {
+                                targetLine = null;
+                            }
                         }
                         break;
                     }
