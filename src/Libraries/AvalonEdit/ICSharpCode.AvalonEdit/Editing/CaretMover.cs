@@ -16,10 +16,19 @@ namespace ICSharpCode.AvalonEdit.Editing
             MoveCaret(textArea, direction, 1);
         }
 
+        public static void MoveCaret(TextArea textArea, CaretMovementType direction, bool multiline)
+        {
+            MoveCaret(textArea, direction, 1, multiline);
+        }
+
         public static void MoveCaret(TextArea textArea, CaretMovementType direction, int numberOfTimes)
         {
+            MoveCaret(textArea, direction, numberOfTimes, true); 
+        }
+        public static void MoveCaret(TextArea textArea, CaretMovementType direction, int numberOfTimes, bool multiline)
+        {
             textArea.Selection = Selection.Empty;
-            MoveTheCaret(textArea, direction, numberOfTimes);
+            MoveTheCaret(textArea, direction, numberOfTimes, multiline);
             textArea.Caret.BringCaretToView();
         }
 
@@ -30,32 +39,42 @@ namespace ICSharpCode.AvalonEdit.Editing
 
         public static void MoveCaretExtendSelection(TextArea textArea, CaretMovementType direction, int numberOfTimes)
         {
+            MoveCaretExtendSelection(textArea, direction, numberOfTimes, true);
+        }
+
+        public static void MoveCaretExtendSelection(TextArea textArea, CaretMovementType direction, int numberOfTimes, bool multiline)
+        {
             int oldOffset = textArea.Caret.Offset;
-            MoveTheCaret(textArea, direction, numberOfTimes);
+            MoveTheCaret(textArea, direction, numberOfTimes, multiline);
             textArea.Selection = textArea.Selection.StartSelectionOrSetEndpoint(oldOffset, textArea.Caret.Offset);
             textArea.Caret.BringCaretToView();
         }
 
         #region Caret movement
-        static void MoveTheCaret(TextArea textArea, CaretMovementType direction, int numberOfTimes)
+        static VisualLine GetVisualLineFromCaretPosition(TextArea textArea)
         {
             DocumentLine caretLine = textArea.Document.GetLineByNumber(textArea.Caret.Line);
-            VisualLine visualLine = textArea.TextView.GetOrConstructVisualLine(caretLine);
+            return textArea.TextView.GetOrConstructVisualLine(caretLine);
+        }
+   
+        static void MoveTheCaret(TextArea textArea, CaretMovementType direction, int numberOfTimes, bool multiline)
+        {
+            VisualLine visualLine = GetVisualLineFromCaretPosition(textArea);
             TextViewPosition caretPosition = textArea.Caret.Position;
             TextLine textLine = visualLine.GetTextLine(caretPosition.VisualColumn);
             switch (direction)
             {
                 case CaretMovementType.CharLeft:
-                    MoveCaretLeft(textArea, caretPosition, visualLine, CaretPositioningMode.Normal, numberOfTimes);
+                    MoveCaretLeft(textArea, caretPosition, visualLine, CaretPositioningMode.Normal, numberOfTimes, multiline);
                     break;
                 case CaretMovementType.CharRight:
-                    MoveCaretRight(textArea, caretPosition, visualLine, CaretPositioningMode.Normal, numberOfTimes);
+                    MoveCaretRight(textArea, caretPosition, visualLine, CaretPositioningMode.Normal, numberOfTimes, multiline);
                     break;
                 case CaretMovementType.WordLeft:
-                    MoveCaretLeft(textArea, caretPosition, visualLine, CaretPositioningMode.WordStart, numberOfTimes);
+                    MoveCaretLeft(textArea, caretPosition, visualLine, CaretPositioningMode.WordStart, numberOfTimes, true); // moving by words is always multiline
                     break;
                 case CaretMovementType.WordRight:
-                    MoveCaretRight(textArea, caretPosition, visualLine, CaretPositioningMode.WordStart, numberOfTimes);
+                    MoveCaretRight(textArea, caretPosition, visualLine, CaretPositioningMode.WordStart, numberOfTimes, true); // moving by words is always multiline
                     break;
                 case CaretMovementType.LineUp:
                 case CaretMovementType.LineDown:
@@ -103,59 +122,73 @@ namespace ICSharpCode.AvalonEdit.Editing
         #endregion
 
         #region By-character / By-word movement
-        static void MoveCaretRight(TextArea textArea, TextViewPosition caretPosition, VisualLine visualLine, CaretPositioningMode mode, int numberOfTimes)
+        static void MoveCaretRight(TextArea textArea, TextViewPosition caretPosition, VisualLine visualLine, CaretPositioningMode mode, int numberOfTimes, bool multiline)
         {
-            int pos = visualLine.GetNextCaretPosition(caretPosition.VisualColumn, LogicalDirection.Forward, mode);
-            if (pos >= 0)
+            for (var i = 0; i < numberOfTimes; i++)
             {
-                SetCaretPosition(textArea, pos, visualLine.GetRelativeOffset(pos) + visualLine.FirstDocumentLine.Offset);
-            }
-            else
-            {
-                // move to start of next line
-                DocumentLine nextDocumentLine = visualLine.LastDocumentLine.NextLine;
-                if (nextDocumentLine != null)
+                int pos = visualLine.GetNextCaretPosition(caretPosition.VisualColumn, LogicalDirection.Forward, mode);
+                if (pos >= 0)
                 {
-                    VisualLine nextLine = textArea.TextView.GetOrConstructVisualLine(nextDocumentLine);
-                    pos = nextLine.GetNextCaretPosition(-1, LogicalDirection.Forward, mode);
-                    if (pos < 0)
-                        throw ThrowUtil.NoValidCaretPosition();
-                    SetCaretPosition(textArea, pos, nextLine.GetRelativeOffset(pos) + nextLine.FirstDocumentLine.Offset);
+                    SetCaretPosition(textArea, pos, visualLine.GetRelativeOffset(pos) + visualLine.FirstDocumentLine.Offset);
                 }
-                else
+                else if (multiline)
                 {
-                    // at end of document
-                    Debug.Assert(visualLine.LastDocumentLine.Offset + visualLine.LastDocumentLine.TotalLength == textArea.Document.TextLength);
-                    SetCaretPosition(textArea, -1, textArea.Document.TextLength);
+                    // move to start of next line
+                    DocumentLine nextDocumentLine = visualLine.LastDocumentLine.NextLine;
+                    if (nextDocumentLine != null)
+                    {
+                        VisualLine nextLine = textArea.TextView.GetOrConstructVisualLine(nextDocumentLine);
+                        pos = nextLine.GetNextCaretPosition(-1, LogicalDirection.Forward, mode);
+                        if (pos < 0)
+                            throw ThrowUtil.NoValidCaretPosition();
+                        SetCaretPosition(textArea, pos, nextLine.GetRelativeOffset(pos) + nextLine.FirstDocumentLine.Offset);
+                    }
+                    else
+                    {
+                        // at end of document
+                        Debug.Assert(visualLine.LastDocumentLine.Offset + visualLine.LastDocumentLine.TotalLength == textArea.Document.TextLength);
+                        SetCaretPosition(textArea, -1, textArea.Document.TextLength);
+                    }
                 }
+
+                // update our reference points for the next step
+                visualLine = GetVisualLineFromCaretPosition(textArea);
+                caretPosition = textArea.Caret.Position;
             }
         }
 
-        static void MoveCaretLeft(TextArea textArea, TextViewPosition caretPosition, VisualLine visualLine, CaretPositioningMode mode, int numberOfTimes)
+        static void MoveCaretLeft(TextArea textArea, TextViewPosition caretPosition, VisualLine visualLine, CaretPositioningMode mode, int numberOfTimes, bool multiline)
         {
-            int pos = visualLine.GetNextCaretPosition(caretPosition.VisualColumn, LogicalDirection.Backward, mode);
-            if (pos >= 0)
+            for (var i = 0; i < numberOfTimes; i++)
             {
-                SetCaretPosition(textArea, pos, visualLine.GetRelativeOffset(pos) + visualLine.FirstDocumentLine.Offset);
-            }
-            else
-            {
-                // move to end of previous line
-                DocumentLine previousDocumentLine = visualLine.FirstDocumentLine.PreviousLine;
-                if (previousDocumentLine != null)
+                int pos = visualLine.GetNextCaretPosition(caretPosition.VisualColumn, LogicalDirection.Backward, mode);
+                if (pos >= 0)
                 {
-                    VisualLine previousLine = textArea.TextView.GetOrConstructVisualLine(previousDocumentLine);
-                    pos = previousLine.GetNextCaretPosition(previousLine.VisualLength + 1, LogicalDirection.Backward, mode);
-                    if (pos < 0)
-                        throw ThrowUtil.NoValidCaretPosition();
-                    SetCaretPosition(textArea, pos, previousLine.GetRelativeOffset(pos) + previousLine.FirstDocumentLine.Offset);
+                    SetCaretPosition(textArea, pos, visualLine.GetRelativeOffset(pos) + visualLine.FirstDocumentLine.Offset);
                 }
-                else
+                else if (multiline)
                 {
-                    // at start of document
-                    Debug.Assert(visualLine.FirstDocumentLine.Offset == 0);
-                    SetCaretPosition(textArea, 0, 0);
+                    // move to end of previous line
+                    DocumentLine previousDocumentLine = visualLine.FirstDocumentLine.PreviousLine;
+                    if (previousDocumentLine != null)
+                    {
+                        VisualLine previousLine = textArea.TextView.GetOrConstructVisualLine(previousDocumentLine);
+                        pos = previousLine.GetNextCaretPosition(previousLine.VisualLength + 1, LogicalDirection.Backward, mode);
+                        if (pos < 0)
+                            throw ThrowUtil.NoValidCaretPosition();
+                        SetCaretPosition(textArea, pos, previousLine.GetRelativeOffset(pos) + previousLine.FirstDocumentLine.Offset);
+                    }
+                    else
+                    {
+                        // at start of document
+                        Debug.Assert(visualLine.FirstDocumentLine.Offset == 0);
+                        SetCaretPosition(textArea, 0, 0);
+                    }
                 }
+
+                // update our reference points for the next step
+                visualLine = GetVisualLineFromCaretPosition(textArea);
+                caretPosition = textArea.Caret.Position;
             }
         }
         #endregion

@@ -347,8 +347,8 @@ namespace ICSharpCode.AvalonEdit.Rendering
 		/// <summary>
 		/// Gets the next possible caret position after visualColumn, or -1 if there is no caret position.
 		/// </summary>
-		public int GetNextCaretPosition(int visualColumn, LogicalDirection direction, CaretPositioningMode mode)
-		{
+        public int GetNextCaretPosition(int visualColumn, LogicalDirection direction, CaretPositioningMode mode)
+        {
 			if (elements.Count == 0) {
 				// special handling for empty visual lines:
 				// even though we don't have any elements,
