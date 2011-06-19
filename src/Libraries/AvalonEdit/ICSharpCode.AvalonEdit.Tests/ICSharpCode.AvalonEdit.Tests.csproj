@@ -77,6 +77,7 @@
     <Compile Include="Document\TextAnchorTest.cs" />
     <Compile Include="Document\TextSegmentTreeTest.cs" />
     <Compile Include="Document\TextUtilitiesTests.cs" />
+    <Compile Include="Editing\CaretMoverTests.cs" />
     <Compile Include="Editing\ChangeDocumentTests.cs" />
     <Compile Include="Editing\TextSegmentReadOnlySectionTests.cs" />
     <Compile Include="Highlighting\HtmlClipboardTests.cs" />

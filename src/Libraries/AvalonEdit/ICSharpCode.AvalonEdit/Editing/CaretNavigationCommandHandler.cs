@@ -98,7 +98,7 @@ namespace ICSharpCode.AvalonEdit.Editing
                 if (textArea != null && textArea.Document != null)
                 {
                     args.Handled = true;
-                    CaretMover.MoveCaretClearSelection(textArea, direction);
+                    CaretMover.MoveCaret(textArea, direction);
                 }
             };
         }
