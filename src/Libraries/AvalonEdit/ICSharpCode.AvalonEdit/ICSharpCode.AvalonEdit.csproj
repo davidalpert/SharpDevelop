@@ -138,6 +138,8 @@
     <Compile Include="Editing\Caret.cs" />
     <Compile Include="Editing\CaretLayer.cs">
     </Compile>
+    <Compile Include="Editing\CaretMovementType.cs" />
+    <Compile Include="Editing\CaretMover.cs" />
     <Compile Include="Editing\CaretNavigationCommandHandler.cs">
     </Compile>
     <Compile Include="Editing\CaretWeakEventHandler.cs" />
