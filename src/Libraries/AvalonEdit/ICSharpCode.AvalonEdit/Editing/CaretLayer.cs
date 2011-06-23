@@ -14,10 +14,23 @@ using ICSharpCode.AvalonEdit.Document;
 
 namespace ICSharpCode.AvalonEdit.Editing
 {
+    public class CursorOverwriteArgs
+    {
+        public CursorOverwriteArgs(int offset, int currentColumn, int visualLength)
+        {
+            this.Offset = offset;
+            this.AtTheEndOfAVisualLine = currentColumn > visualLength;
+        }
+
+        public int Offset { get; private set; }
+
+        public bool AtTheEndOfAVisualLine { get; private set; }
+    }
+
     sealed class CaretLayer : Layer
     {
         CursorMode cursorMode;
-        int offSet;
+        CursorOverwriteArgs overwriteArgs;
         bool isVisible;
         Rect caretRectangle;
 
@@ -29,8 +42,8 @@ namespace ICSharpCode.AvalonEdit.Editing
         {
             this.IsHitTestVisible = false;
             caretBlinkTimer.Tick += new EventHandler(caretBlinkTimer_Tick);
-            cursorMode = CursorMode.Insert; // the default
-            offSet = 0; // default to the beginning
+            cursorMode = CursorMode.Insert; // by default
+            overwriteArgs = null; // by default
         }
 
         void caretBlinkTimer_Tick(object sender, EventArgs e)
@@ -41,15 +54,15 @@ namespace ICSharpCode.AvalonEdit.Editing
 
         public void Show(Rect caretRectangle)
         {
-            Show(caretRectangle);
+            Show(caretRectangle, CursorMode.Insert, null);
         }
 
-        public void Show(Rect caretRect, CursorMode mode, int cursorOffset)
+        public void Show(Rect caretRect, CursorMode mode, CursorOverwriteArgs overwriteArgs)
         {
-            this.caretRectangle = caretRectangle;
+            this.caretRectangle = caretRect;
             this.isVisible = true;
             this.cursorMode = mode;
-            this.offSet = cursorOffset;
+            this.overwriteArgs = overwriteArgs;
             InvalidateVisual();
             StartBlinkAnimation();
         }
@@ -95,7 +108,10 @@ namespace ICSharpCode.AvalonEdit.Editing
                         DrawInsertCursor(drawingContext);
                         break;
                     case CursorMode.Overwrite:
-                        DrawOverwriteCursor(drawingContext);
+                        if (overwriteArgs.AtTheEndOfAVisualLine)
+                            DrawInsertCursor(drawingContext);
+                        else
+                            DrawOverwriteCursor(drawingContext);
                         break;
                 }
             }
@@ -120,7 +136,7 @@ namespace ICSharpCode.AvalonEdit.Editing
             builder.CornerRadius = 1;
             builder.AlignToMiddleOfPixels = true;
 
-            var segment = new TextSegment() { StartOffset = this.offSet, Length = 1 };
+            var segment = new TextSegment() { StartOffset = overwriteArgs.Offset, Length = 1 };
 
             builder.AddSegment(textView, segment);
             builder.CloseFigure();

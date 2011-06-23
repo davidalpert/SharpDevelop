@@ -503,7 +503,7 @@ namespace ICSharpCode.AvalonEdit.Editing
                     {
                         Win32.SetCaretPosition(textView, caretRect.Location - textView.ScrollOffset);
                     }
-                    caretAdorner.Show(caretRect, CaretMode, Offset);
+                    caretAdorner.Show(caretRect, CaretMode, new CursorOverwriteArgs(Offset, Column, visualLine.VisualLength));
                 }
                 else
                 {

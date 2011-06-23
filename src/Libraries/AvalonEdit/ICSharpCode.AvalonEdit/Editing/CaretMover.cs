@@ -18,17 +18,18 @@ namespace ICSharpCode.AvalonEdit.Editing
 
         public static void MoveCaret(TextArea textArea, CaretMovementType direction, bool multiline)
         {
-            MoveCaret(textArea, direction, 1, multiline);
+            MoveCaret(textArea, direction, 1, multiline, false);
         }
 
         public static void MoveCaret(TextArea textArea, CaretMovementType direction, int numberOfTimes)
         {
-            MoveCaret(textArea, direction, numberOfTimes, true); 
+            MoveCaret(textArea, direction, numberOfTimes, true, false);
         }
-        public static void MoveCaret(TextArea textArea, CaretMovementType direction, int numberOfTimes, bool multiline)
+
+        public static void MoveCaret(TextArea textArea, CaretMovementType direction, int numberOfTimes, bool multiline, bool skipLastCharacter)
         {
             textArea.Selection = Selection.Empty;
-            MoveTheCaret(textArea, direction, numberOfTimes, multiline);
+            MoveTheCaret(textArea, direction, numberOfTimes, multiline, skipLastCharacter);
             textArea.Caret.BringCaretToView();
         }
 
@@ -39,13 +40,13 @@ namespace ICSharpCode.AvalonEdit.Editing
 
         public static void MoveCaretExtendSelection(TextArea textArea, CaretMovementType direction, int numberOfTimes)
         {
-            MoveCaretExtendSelection(textArea, direction, numberOfTimes, true);
+            MoveCaretExtendSelection(textArea, direction, numberOfTimes, true, false);
         }
 
-        public static void MoveCaretExtendSelection(TextArea textArea, CaretMovementType direction, int numberOfTimes, bool multiline)
+        public static void MoveCaretExtendSelection(TextArea textArea, CaretMovementType direction, int numberOfTimes, bool multiline, bool skipLastCharacters)
         {
             int oldOffset = textArea.Caret.Offset;
-            MoveTheCaret(textArea, direction, numberOfTimes, multiline);
+            MoveTheCaret(textArea, direction, numberOfTimes, multiline, skipLastCharacters);
             textArea.Selection = textArea.Selection.StartSelectionOrSetEndpoint(oldOffset, textArea.Caret.Offset);
             textArea.Caret.BringCaretToView();
         }
@@ -56,8 +57,8 @@ namespace ICSharpCode.AvalonEdit.Editing
             DocumentLine caretLine = textArea.Document.GetLineByNumber(textArea.Caret.Line);
             return textArea.TextView.GetOrConstructVisualLine(caretLine);
         }
-   
-        static void MoveTheCaret(TextArea textArea, CaretMovementType direction, int numberOfTimes, bool multiline)
+
+        static void MoveTheCaret(TextArea textArea, CaretMovementType direction, int numberOfTimes, bool multiline, bool skipLastCharacters)
         {
             VisualLine visualLine = GetVisualLineFromCaretPosition(textArea);
             TextViewPosition caretPosition = textArea.Caret.Position;
@@ -65,22 +66,22 @@ namespace ICSharpCode.AvalonEdit.Editing
             switch (direction)
             {
                 case CaretMovementType.CharLeft:
-                    MoveCaretLeft(textArea, caretPosition, visualLine, CaretPositioningMode.Normal, numberOfTimes, multiline);
+                    MoveCaretLeft(textArea, caretPosition, visualLine, CaretPositioningMode.Normal, numberOfTimes, multiline, skipLastCharacters);
                     break;
                 case CaretMovementType.CharRight:
-                    MoveCaretRight(textArea, caretPosition, visualLine, CaretPositioningMode.Normal, numberOfTimes, multiline);
+                    MoveCaretRight(textArea, caretPosition, visualLine, CaretPositioningMode.Normal, numberOfTimes, multiline, skipLastCharacters);
                     break;
                 case CaretMovementType.WordLeft:
-                    MoveCaretLeft(textArea, caretPosition, visualLine, CaretPositioningMode.WordStart, numberOfTimes, true); // moving by words is always multiline
+                    MoveCaretLeft(textArea, caretPosition, visualLine, CaretPositioningMode.WordStart, numberOfTimes, true, true); // moving by words is always multiline
                     break;
                 case CaretMovementType.WordRight:
-                    MoveCaretRight(textArea, caretPosition, visualLine, CaretPositioningMode.WordStart, numberOfTimes, true); // moving by words is always multiline
+                    MoveCaretRight(textArea, caretPosition, visualLine, CaretPositioningMode.WordStart, numberOfTimes, true, true); // moving by words is always multiline
                     break;
                 case CaretMovementType.LineUp:
                 case CaretMovementType.LineDown:
                 case CaretMovementType.PageUp:
                 case CaretMovementType.PageDown:
-                    MoveCaretUpDown(textArea, direction, visualLine, textLine, caretPosition.VisualColumn, numberOfTimes);
+                    MoveCaretUpDown(textArea, direction, visualLine, textLine, caretPosition.VisualColumn, numberOfTimes, skipLastCharacters);
                     break;
                 case CaretMovementType.DocumentStart:
                     SetCaretPosition(textArea, 0, 0);
@@ -122,12 +123,12 @@ namespace ICSharpCode.AvalonEdit.Editing
         #endregion
 
         #region By-character / By-word movement
-        static void MoveCaretRight(TextArea textArea, TextViewPosition caretPosition, VisualLine visualLine, CaretPositioningMode mode, int numberOfTimes, bool multiline)
+        static void MoveCaretRight(TextArea textArea, TextViewPosition caretPosition, VisualLine visualLine, CaretPositioningMode mode, int numberOfTimes, bool multiline, bool skipLastCharacter)
         {
             for (var i = 0; i < numberOfTimes; i++)
             {
                 int pos = visualLine.GetNextCaretPosition(caretPosition.VisualColumn, LogicalDirection.Forward, mode);
-                if (pos >= 0)
+                if (pos >= 0 && (!skipLastCharacter || pos < visualLine.VisualLength))
                 {
                     SetCaretPosition(textArea, pos, visualLine.GetRelativeOffset(pos) + visualLine.FirstDocumentLine.Offset);
                 }
@@ -157,7 +158,7 @@ namespace ICSharpCode.AvalonEdit.Editing
             }
         }
 
-        static void MoveCaretLeft(TextArea textArea, TextViewPosition caretPosition, VisualLine visualLine, CaretPositioningMode mode, int numberOfTimes, bool multiline)
+        static void MoveCaretLeft(TextArea textArea, TextViewPosition caretPosition, VisualLine visualLine, CaretPositioningMode mode, int numberOfTimes, bool multiline, bool skipLastCharacter)
         {
             for (var i = 0; i < numberOfTimes; i++)
             {
@@ -176,6 +177,8 @@ namespace ICSharpCode.AvalonEdit.Editing
                         pos = previousLine.GetNextCaretPosition(previousLine.VisualLength + 1, LogicalDirection.Backward, mode);
                         if (pos < 0)
                             throw ThrowUtil.NoValidCaretPosition();
+                        if (skipLastCharacter && pos == previousLine.VisualLength)
+                            pos = pos - 1;
                         SetCaretPosition(textArea, pos, previousLine.GetRelativeOffset(pos) + previousLine.FirstDocumentLine.Offset);
                     }
                     else
@@ -194,7 +197,7 @@ namespace ICSharpCode.AvalonEdit.Editing
         #endregion
 
         #region Line+Page up/down
-        static void MoveCaretUpDown(TextArea textArea, CaretMovementType direction, VisualLine visualLine, TextLine textLine, int caretVisualColumn, int numberOfTimes)
+        static void MoveCaretUpDown(TextArea textArea, CaretMovementType direction, VisualLine visualLine, TextLine textLine, int caretVisualColumn, int numberOfTimes, bool skipLastCharacter)
         {
             int numberOfLines = numberOfTimes;
             // moving up/down happens using the desired visual X position
@@ -287,7 +290,7 @@ namespace ICSharpCode.AvalonEdit.Editing
             if (targetLine != null)
             {
                 CharacterHit ch = targetLine.GetCharacterHitFromDistance(xPos);
-                SetCaretPosition(textArea, targetVisualLine, targetLine, ch, false);
+                SetCaretPosition(textArea, targetVisualLine, targetLine, ch, false, skipLastCharacter);
                 textArea.Caret.DesiredXPos = xPos;
             }
         }
@@ -295,12 +298,18 @@ namespace ICSharpCode.AvalonEdit.Editing
 
         #region SetCaretPosition
         static void SetCaretPosition(TextArea textArea, VisualLine targetVisualLine, TextLine targetLine,
-                                     CharacterHit ch, bool allowWrapToNextLine)
+                                     CharacterHit ch, bool allowWrapToNextLine, bool doNotLandOnEndOfLine)
         {
             int newVisualColumn = ch.FirstCharacterIndex + ch.TrailingLength;
             int targetLineStartCol = targetVisualLine.GetTextLineVisualStartColumn(targetLine);
             if (!allowWrapToNextLine && newVisualColumn >= targetLineStartCol + targetLine.Length)
+            {
                 newVisualColumn = targetLineStartCol + targetLine.Length - 1;
+            }
+            if (newVisualColumn == targetLineStartCol + targetLine.Length - 1 && doNotLandOnEndOfLine)
+            {
+                newVisualColumn = newVisualColumn - 1;
+            }
             int newOffset = targetVisualLine.GetRelativeOffset(newVisualColumn) + targetVisualLine.FirstDocumentLine.Offset;
             SetCaretPosition(textArea, newVisualColumn, newOffset);
         }

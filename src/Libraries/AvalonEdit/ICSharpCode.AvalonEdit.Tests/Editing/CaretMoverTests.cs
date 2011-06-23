@@ -100,7 +100,7 @@ namespace ICSharpCode.AvalonEdit.Editing
             textArea.Document = new TextDocument("1\n2\n3\n4th line");
             textArea.Caret.Location = new TextLocation(4, 3);
 
-            CaretMover.MoveCaret(textArea, CaretMovementType.CharLeft, 5, false);
+            CaretMover.MoveCaret(textArea, CaretMovementType.CharLeft, 5, false, false);
 
             Assert.AreEqual(new TextLocation(4, 1), textArea.Caret.Location);
         }
@@ -112,9 +112,57 @@ namespace ICSharpCode.AvalonEdit.Editing
             textArea.Document = new TextDocument("1\n2\n3\n4th line");
             textArea.Caret.Location = new TextLocation(4, 3);
 
-            CaretMover.MoveCaret(textArea, CaretMovementType.CharRight, 8, false);
+            CaretMover.MoveCaret(textArea, CaretMovementType.CharRight, 8, false, false);
 
             Assert.AreEqual(new TextLocation(4, 9), textArea.Caret.Location);
+        }
+
+        [Test]
+        public void CaretMovingRightMultipleTimes_without_Multiline_and_SkippingTheLastCharacter_DoesNotLandOnEndOfLine()
+        {
+            TextArea textArea = new TextArea();
+            textArea.Document = new TextDocument("1\n2\n3\n4th line");
+            textArea.Caret.Location = new TextLocation(3, 1);
+
+            CaretMover.MoveCaret(textArea, CaretMovementType.CharRight, 8, false, true);
+
+            Assert.AreEqual(new TextLocation(3, 1), textArea.Caret.Location);
+        }
+
+        [Test]
+        public void CaretMovingLeftOffTheBeginningOfALine_with_Multiline_and_SkippingTheLastCharacter_DoesNotLandOnEndOfLine()
+        {
+            TextArea textArea = new TextArea();
+            textArea.Document = new TextDocument("1\n2\n3\n4th line");
+            textArea.Caret.Location = new TextLocation(4, 1);
+
+            CaretMover.MoveCaret(textArea, CaretMovementType.CharLeft, 1, true, true);
+
+            Assert.AreEqual(new TextLocation(3, 1), textArea.Caret.Location);
+        }
+
+        [Test]
+        public void CaretMovingUpToAShorterVisualLine_with_SkippingTheLastCharacter_DoesNotLandOnEndOfLine()
+        {
+            TextArea textArea = new TextArea();
+            textArea.Document = new TextDocument("1\n2\n3\n4th line");
+            textArea.Caret.Location = new TextLocation(4, 5);
+
+            CaretMover.MoveCaret(textArea, CaretMovementType.LineUp, 1, false, true);
+
+            Assert.AreEqual(new TextLocation(3, 1), textArea.Caret.Location);
+        }
+
+        [Test]
+        public void CaretMovingDownToAShorterVisualLine_with_SkippingTheLastCharacter_DoesNotLandOnEndOfLine()
+        {
+            TextArea textArea = new TextArea();
+            textArea.Document = new TextDocument("1\n2\n3rd line is very long\n4th line");
+            textArea.Caret.Location = new TextLocation(3, 19);
+
+            CaretMover.MoveCaret(textArea, CaretMovementType.LineDown, 1, false, true);
+
+            Assert.AreEqual(new TextLocation(4, 8), textArea.Caret.Location);
         }
 
         #endregion
