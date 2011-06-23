@@ -242,5 +242,29 @@ namespace ICSharpCode.AvalonEdit.Editing
         }
 
         #endregion
+
+        [Test]
+        public void CaretMoverNavigatesToEndOfLine()
+        {
+            TextArea textArea = new TextArea();
+            textArea.Document = new TextDocument("1\n2\n3\n4th line");
+            textArea.Caret.Location = new TextLocation(4, 3);
+
+            CaretMover.MoveCaret(textArea, CaretMovementType.LineEnd);
+
+            Assert.AreEqual(new TextLocation(4, 9), textArea.Caret.Location);
+        }
+
+        [Test]
+        public void CaretMoverNavigatesToEndOfLine_excluding_last_character()
+        {
+            TextArea textArea = new TextArea();
+            textArea.Document = new TextDocument("1\n2\n3\n4th line");
+            textArea.Caret.Location = new TextLocation(4, 3);
+
+            CaretMover.MoveCaret(textArea, CaretMovementType.LineEnd, 1, false, true);
+
+            Assert.AreEqual(new TextLocation(4, 8), textArea.Caret.Location);
+        }
     }
 }

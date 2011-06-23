@@ -90,10 +90,10 @@ namespace ICSharpCode.AvalonEdit.Editing
                     SetCaretPosition(textArea, -1, textArea.Document.TextLength);
                     break;
                 case CaretMovementType.LineStart:
-                    MoveCaretToStartOfLine(textArea, visualLine);
+                    MoveCaretToStartOfLine(textArea, visualLine, skipLastCharacters);
                     break;
                 case CaretMovementType.LineEnd:
-                    MoveCaretToEndOfLine(textArea, visualLine);
+                    MoveCaretToEndOfLine(textArea, visualLine, skipLastCharacters);
                     break;
                 default:
                     throw new NotSupportedException(direction.ToString());
@@ -102,7 +102,7 @@ namespace ICSharpCode.AvalonEdit.Editing
         #endregion
 
         #region Home/End
-        static void MoveCaretToStartOfLine(TextArea textArea, VisualLine visualLine)
+        static void MoveCaretToStartOfLine(TextArea textArea, VisualLine visualLine, bool skipLastCharacter)
         {
             int newVC = visualLine.GetNextCaretPosition(-1, LogicalDirection.Forward, CaretPositioningMode.WordStart);
             if (newVC < 0)
@@ -114,9 +114,13 @@ namespace ICSharpCode.AvalonEdit.Editing
             SetCaretPosition(textArea, newVC, offset);
         }
 
-        static void MoveCaretToEndOfLine(TextArea textArea, VisualLine visualLine)
+        static void MoveCaretToEndOfLine(TextArea textArea, VisualLine visualLine, bool skipLastCharacter)
         {
             int newVC = visualLine.VisualLength;
+            if (skipLastCharacter)
+            {
+                newVC = newVC - 1;
+            }
             int offset = visualLine.FirstDocumentLine.Offset + visualLine.GetRelativeOffset(newVC);
             SetCaretPosition(textArea, newVC, offset);
         }
