@@ -310,7 +310,7 @@ namespace ICSharpCode.AvalonEdit.Editing
             {
                 newVisualColumn = targetLineStartCol + targetLine.Length - 1;
             }
-            if (newVisualColumn == targetLineStartCol + targetLine.Length - 1 && doNotLandOnEndOfLine)
+            if (newVisualColumn == targetLineStartCol + targetLine.Length - 1 && doNotLandOnEndOfLine && newVisualColumn > 0)
             {
                 newVisualColumn = newVisualColumn - 1;
             }
