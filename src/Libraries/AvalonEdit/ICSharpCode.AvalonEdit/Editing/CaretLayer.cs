@@ -14,25 +14,101 @@ using ICSharpCode.AvalonEdit.Document;
 
 namespace ICSharpCode.AvalonEdit.Editing
 {
-    public class CursorOverwriteArgs
+    public class ShowCursorArgs
     {
-        public CursorOverwriteArgs(int offset, int currentColumn, int visualLength)
+        public static ShowCursorArgs Default
         {
+            get { return new ShowCursorArgs(CursorMode.Insert, 0, 0, 0); }
+        }
+
+        public ShowCursorArgs(CursorMode cursorMode, int offset, int currentColumn, int visualLength)
+        {
+            this.Mode = cursorMode;
             this.Offset = offset;
             this.AtTheEndOfAVisualLine = currentColumn > visualLength;
         }
+
+        public CursorMode Mode { get; private set; }
 
         public int Offset { get; private set; }
 
         public bool AtTheEndOfAVisualLine { get; private set; }
     }
 
+    public class DefaultCursorDrawingStrategy : ICursorDrawingStrategy
+    {
+        public void DrawCursor(DrawingContext drawingContext, DrawCursorArgs args)
+        {
+            if (drawingContext == null)
+                throw new InvalidOperationException("Cannot draw a cursor into a null context");
+
+            if (args == null)
+                throw new InvalidOperationException("don't know what to draw with null args");
+
+            switch (args.CursorMode)
+            {
+                case CursorMode.Insert:
+                    DrawInsertCursor(drawingContext, args);
+                    break;
+                case CursorMode.Overwrite:
+                    DrawOverwriteCursor(drawingContext, args);
+                    break;
+            }
+        }
+
+        private void DrawInsertCursor(DrawingContext drawingContext, DrawCursorArgs args)
+        {
+            Brush caretBrush = args.Brush;
+            if (caretBrush == null)
+                caretBrush = (Brush)(args.TextView.GetValue(TextBlock.ForegroundProperty));
+            Rect r = new Rect(args.CaretRectangle.X - args.TextView.HorizontalOffset,
+                              args.CaretRectangle.Y - args.TextView.VerticalOffset,
+                              args.CaretRectangle.Width,
+                              args.CaretRectangle.Height);
+            drawingContext.DrawRectangle(caretBrush, null, PixelSnapHelpers.Round(r, PixelSnapHelpers.GetPixelSize(args.TextView)));
+        }
+        
+        private void DrawOverwriteCursor(DrawingContext drawingContext, DrawCursorArgs args)
+        {
+            BackgroundGeometryBuilder builder = new BackgroundGeometryBuilder();
+
+            builder.CornerRadius = 1;
+            builder.AlignToMiddleOfPixels = true;
+
+            var segment = new TextSegment() { StartOffset = args.Offset, Length = 1 };
+
+            builder.AddSegment(args.TextView, segment);
+            builder.CloseFigure();
+
+            Geometry geometry = builder.CreateGeometry();
+            if (geometry != null)
+            {
+                drawingContext.DrawGeometry(args.Brush, args.Pen, geometry);
+            }
+        }
+    }
+
+    public class DrawCursorArgs
+    {
+        public TextView TextView { get; set; }
+        public CursorMode CursorMode { get; set; }
+        public Rect CaretRectangle { get; set; }
+        public Brush Brush { get; set; }
+        public Pen Pen { get; set; }
+        public int Offset { get; set; }
+        public int Column { get; set; }
+        public VisualLine VisualLine { get; set; }
+    }
+
+    public interface ICursorDrawingStrategy
+    {
+        void DrawCursor(DrawingContext drawingContext, DrawCursorArgs drawCursorArgs);
+    }
+
     sealed class CaretLayer : Layer
     {
-        CursorMode cursorMode;
-        CursorOverwriteArgs overwriteArgs;
+        DrawCursorArgs drawCursorArgs;
         bool isVisible;
-        Rect caretRectangle;
 
         DispatcherTimer caretBlinkTimer = new DispatcherTimer();
         bool blink;
@@ -42,8 +118,8 @@ namespace ICSharpCode.AvalonEdit.Editing
         {
             this.IsHitTestVisible = false;
             caretBlinkTimer.Tick += new EventHandler(caretBlinkTimer_Tick);
-            cursorMode = CursorMode.Insert; // by default
-            overwriteArgs = null; // by default
+
+            this.CursorDrawingStrategy = new DefaultCursorDrawingStrategy();
         }
 
         void caretBlinkTimer_Tick(object sender, EventArgs e)
@@ -54,15 +130,23 @@ namespace ICSharpCode.AvalonEdit.Editing
 
         public void Show(Rect caretRectangle)
         {
-            Show(caretRectangle, CursorMode.Insert, null);
+            var args = new DrawCursorArgs
+            {
+                TextView = textView,
+                Brush = CaretBrush,
+                Pen = CaretPen,
+                CaretRectangle = caretRectangle,
+                CursorMode = CursorMode.Insert,
+            };
+
+            Show(args);
         }
 
-        public void Show(Rect caretRect, CursorMode mode, CursorOverwriteArgs overwriteArgs)
+        public void Show(DrawCursorArgs args)
         {
-            this.caretRectangle = caretRect;
+            this.drawCursorArgs = args;
+
             this.isVisible = true;
-            this.cursorMode = mode;
-            this.overwriteArgs = overwriteArgs;
             InvalidateVisual();
             StartBlinkAnimation();
         }
@@ -95,6 +179,7 @@ namespace ICSharpCode.AvalonEdit.Editing
         }
 
         internal Brush CaretBrush;
+
         internal Pen CaretPen;
 
         protected override void OnRender(DrawingContext drawingContext)
@@ -102,50 +187,13 @@ namespace ICSharpCode.AvalonEdit.Editing
             base.OnRender(drawingContext);
             if (isVisible && blink)
             {
-                switch (cursorMode)
-                {
-                    case CursorMode.Insert:
-                        DrawInsertCursor(drawingContext);
-                        break;
-                    case CursorMode.Overwrite:
-                        if (overwriteArgs.AtTheEndOfAVisualLine)
-                            DrawInsertCursor(drawingContext);
-                        else
-                            DrawOverwriteCursor(drawingContext);
-                        break;
-                }
+                drawCursorArgs.Brush = this.CaretBrush;
+                drawCursorArgs.Pen = this.CaretPen;
+
+                CursorDrawingStrategy.DrawCursor(drawingContext, drawCursorArgs);
             }
         }
 
-        protected void DrawInsertCursor(DrawingContext drawingContext)
-        {
-            Brush caretBrush = this.CaretBrush;
-            if (caretBrush == null)
-                caretBrush = (Brush)textView.GetValue(TextBlock.ForegroundProperty);
-            Rect r = new Rect(caretRectangle.X - textView.HorizontalOffset,
-                              caretRectangle.Y - textView.VerticalOffset,
-                              caretRectangle.Width,
-                              caretRectangle.Height);
-            drawingContext.DrawRectangle(caretBrush, null, PixelSnapHelpers.Round(r, PixelSnapHelpers.GetPixelSize(this)));
-        }
-
-        protected void DrawOverwriteCursor(DrawingContext drawingContext)
-        {
-            BackgroundGeometryBuilder builder = new BackgroundGeometryBuilder();
-
-            builder.CornerRadius = 1;
-            builder.AlignToMiddleOfPixels = true;
-
-            var segment = new TextSegment() { StartOffset = overwriteArgs.Offset, Length = 1 };
-
-            builder.AddSegment(textView, segment);
-            builder.CloseFigure();
-
-            Geometry geometry = builder.CreateGeometry();
-            if (geometry != null)
-            {
-                drawingContext.DrawGeometry(this.CaretBrush, this.CaretPen, geometry);
-            }
-        }
+        public ICursorDrawingStrategy CursorDrawingStrategy { get; set; }
     }
 }
